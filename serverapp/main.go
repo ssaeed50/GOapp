@@ -2,30 +2,43 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
-func apihandler(w http.ResponseWriter, r *http.Request) {
+/// Upload function logic
 
-	//fmt.Fprintf(w, "Hello World")
-	log.Printf("Received %s request for host %s from IP address %s and X-FORWARDED-FOR %s",
-		r.Method, r.Host, r.RemoteAddr, r.Header.Get("X-FORWARDED-FOR"))
-	body, err := ioutil.ReadAll(r.Body)
+func uploadfile(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Received %s request for host %s from IP address %s",
+		r.Method, r.Host, r.RemoteAddr)
+
+	//r.ParseMultipartForm(32 << 20)
+
+	file, err := os.Create("./result")
+
 	if err != nil {
-		body = []byte(fmt.Sprintf("error reading request body: %s", err))
+
+		log.Fatal(err)
 	}
-	resp := fmt.Sprintf("Hello, %s from Simple Server!", body)
-	w.Write([]byte(resp))
-	log.Printf("SimpleServer: Sent response %s", resp)
+	n, err := io.Copy(file, r.Body)
+	if err != nil {
+		panic(err)
+	}
+	w.Write([]byte(fmt.Sprintf("%d bytes are recieved.\n", n)))
+
 }
-func healthzhandler(w http.ResponseWriter, r *http.Request) {
+
+//Test functions
+
+/*func healthzhandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "OK")
 }
-
+*/
 /*
 func setuphandlers(mux *http.ServeMux) {
 
@@ -33,6 +46,7 @@ func setuphandlers(mux *http.ServeMux) {
 		mux.HandleFunc("/api", apihandler)
 	}
 */
+
 func main() {
 
 	/*listenAddr := os.Getenv("LISTEN_ADDR")
@@ -43,11 +57,11 @@ func main() {
 	}
 	*/
 	//port := flag.String("port", "8080", "The http port, defaults to 8080")
-	mux := http.NewServeMux()
 	//setuphandlers(mux)
+	//mux.HandleFunc("/healthz", healthzhandler)
 
-	mux.HandleFunc("/healthz", healthzhandler)
-	mux.HandleFunc("/api", apihandler)
+	mux := http.NewServeMux()
+	// server struct
 	srv := &http.Server{
 		ReadTimeout:       5 * time.Minute,
 		WriteTimeout:      10 * time.Second,
@@ -57,8 +71,9 @@ func main() {
 		Handler:           mux,
 	}
 
+	mux.HandleFunc("/upload", uploadfile)
 	//log.Fatal(http.ListenAndServe(, mux))
-	fmt.Printf("Starting server at port 8080\n")
+
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
