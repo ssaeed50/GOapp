@@ -1,0 +1,4 @@
+#### Upload test file
+
+POST http://localhost:8080/upload
+Content-Type: multipart/form-data;boundary=SOME_BOUNDARY
