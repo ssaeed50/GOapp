@@ -1,12 +1,15 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
+	"strings"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 /// Upload function logic
@@ -16,49 +19,57 @@ func uploadfile(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received %s request for host %s from IP address %s",
 		r.Method, r.Host, r.RemoteAddr)
 
-	//r.ParseMultipartForm(32 << 20)
-
-	file, err := os.Create("./result")
+	/*file, err := os.Create("./result")
 
 	if err != nil {
 
-		log.Fatal(err)
+		panic(err)
 	}
-	n, err := io.Copy(file, r.Body)
+	*/
+	// Return the number of bytes copied to newfile
+	buf := new(strings.Builder)
+	newfile, err := io.Copy(buf, r.Body)
 	if err != nil {
 		panic(err)
 	}
-	w.Write([]byte(fmt.Sprintf("%d bytes are recieved.\n", n)))
+	w.Write([]byte(fmt.Sprintf("%d bytes are recieved.\n", newfile)))
+	fmt.Println("File content.\n", buf.String())
 
 }
 
-//Test functions
+func connectdb(name string) {
 
-/*func healthzhandler(w http.ResponseWriter, r *http.Request) {
+	db, err := sql.Open("mysql", "root:VMware1!@tcp(localhost:3306)/test")
 
-	fmt.Fprintf(w, "OK")
-}
-*/
-/*
-func setuphandlers(mux *http.ServeMux) {
-
-		mux.HandleFunc("/healthz", healthzhandler)
-		mux.HandleFunc("/api", apihandler)
+	if err != nil {
+		panic(err.Error())
 	}
-*/
+	pingErr := db.Ping()
+	if pingErr != nil {
+		panic(pingErr)
+	}
+	fmt.Println("Connected!")
 
-func main() {
-
-	/*listenAddr := os.Getenv("LISTEN_ADDR")
-
-	if len(listenAddr) == 0 {
-
-		listenAddr = "3333"
+	//defer db.Close()
+	/*_, err = db.Exec("CREATE DATABASE " + name)
+	if err != nil {
+		panic(err)
 	}
 	*/
-	//port := flag.String("port", "8080", "The http port, defaults to 8080")
-	//setuphandlers(mux)
-	//mux.HandleFunc("/healthz", healthzhandler)
+	_, err = db.Exec("USE " + name)
+	if err != nil {
+		panic(err)
+	}
+
+	/*_, err = db.Exec("CREATE TABLE example ( id integer, data varchar(32) )")
+	if err != nil {
+		panic(err)
+	}
+	*/
+
+}
+
+func main() {
 
 	mux := http.NewServeMux()
 	// server struct
@@ -71,10 +82,13 @@ func main() {
 		Handler:           mux,
 	}
 
+	connectdb("go")
+
 	mux.HandleFunc("/upload", uploadfile)
 	//log.Fatal(http.ListenAndServe(, mux))
 
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
+
 }
