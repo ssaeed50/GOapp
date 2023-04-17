@@ -1,94 +1,120 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
-	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-/// Upload function logic
+/// Upload Handler logic
 
 func uploadfile(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Received %s request for host %s from IP address %s",
 		r.Method, r.Host, r.RemoteAddr)
 
-	/*file, err := os.Create("./result")
+	// Get the file content and name from the request
+
+	fileContent, _, err := r.FormFile("file")
 
 	if err != nil {
 
-		panic(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	*/
-	// Return the number of bytes copied to newfile
-	buf := new(strings.Builder)
-	newfile, err := io.Copy(buf, r.Body)
+	defer fileContent.Close()
+
+	// Read the file content
+	fileBytes, err := ioutil.ReadAll(fileContent)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	w.Write([]byte(fmt.Sprintf("%d bytes are recieved.\n", newfile)))
-	fmt.Println("File content.\n", buf.String())
+	//fileName := fileHeader.Filename
 
-}
+	//fmt.Println("Filename: %s\n",fileName)
+	//fmt.Println("content: %s\n",fileContent)
 
-func connectdb(name string) {
-
+	// Connect to the MySQL database
 	db, err := sql.Open("mysql", "root:VMware1!@tcp(localhost:3306)/test")
 
 	if err != nil {
-		panic(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	pingErr := db.Ping()
 	if pingErr != nil {
-		panic(pingErr)
+		http.Error(w, pingErr.Error(), http.StatusInternalServerError)
+		return
 	}
-	fmt.Println("Connected!")
+	defer db.Close()
 
-	//defer db.Close()
-	/*_, err = db.Exec("CREATE DATABASE " + name)
+	// Insert the file content and name into the database
+
+	result, err := db.Exec("INSERT INTO files (content) VALUES (?)", fileBytes)
 	if err != nil {
-		panic(err)
-	}
-	*/
-	_, err = db.Exec("USE " + name)
-	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	/*_, err = db.Exec("CREATE TABLE example ( id integer, data varchar(32) )")
+	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	*/
+	log.Printf("Saved file to the database. Rows affected: %d\n", rowsAffected)
+
+	// Return a success response to the client
+	fmt.Fprint(w, "File uploaded successfully")
 
 }
 
 func main() {
 
-	mux := http.NewServeMux()
+	///////created http mux server while using http not tls////////
+	//mux := http.NewServeMux()
 	// server struct
-	srv := &http.Server{
-		ReadTimeout:       5 * time.Minute,
-		WriteTimeout:      10 * time.Second,
-		Addr:              "localhost:8080",
-		IdleTimeout:       15 * time.Second,
-		ReadHeaderTimeout: 3 * time.Second,
-		Handler:           mux,
-	}
+	/*	srv := &http.Server{
+			ReadTimeout:       5 * time.Minute,
+			WriteTimeout:      10 * time.Second,
+			Addr:              "localhost:8080",
+			IdleTimeout:       15 * time.Second,
+			ReadHeaderTimeout: 3 * time.Second,
+			Handler:           mux,
+		}
+	*/
+	//connectdb("go")
 
-	connectdb("go")
-
-	mux.HandleFunc("/upload", uploadfile)
+	//	mux.HandleFunc("/upload", uploadfile).Methods("POST")
 	//log.Fatal(http.ListenAndServe(, mux))
 
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatal(err)
+	/*	if err := srv.ListenAndServe(); err != nil {
+			log.Fatal(err)
+		}
+	*/
+
+	//Create a TLS listner
+
+	cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
+	if err != nil {
+		log.Fatalf("Failed to load TLS certificate: %v", err)
 	}
+
+	config := &tls.Config{Certificates: []tls.Certificate{cert}}
+	listener, err := tls.Listen("tcp", ":8080", config)
+	if err != nil {
+		log.Fatalf("Failed to create listener: %v", err)
+	}
+	defer listener.Close()
+
+	// Handle incoming requests
+	http.HandleFunc("/upload", uploadfile)
+	log.Printf("Server listening on %s", listener.Addr().String())
+	http.Serve(listener, nil)
 
 }
