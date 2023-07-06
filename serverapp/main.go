@@ -76,28 +76,6 @@ func uploadfile(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	///////created http mux server while using http not tls////////
-	//mux := http.NewServeMux()
-	// server struct
-	/*	srv := &http.Server{
-			ReadTimeout:       5 * time.Minute,
-			WriteTimeout:      10 * time.Second,
-			Addr:              "localhost:8080",
-			IdleTimeout:       15 * time.Second,
-			ReadHeaderTimeout: 3 * time.Second,
-			Handler:           mux,
-		}
-	*/
-	//connectdb("go")
-
-	//	mux.HandleFunc("/upload", uploadfile).Methods("POST")
-	//log.Fatal(http.ListenAndServe(, mux))
-
-	/*	if err := srv.ListenAndServe(); err != nil {
-			log.Fatal(err)
-		}
-	*/
-
 	//Create a TLS listner
 
 	cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
